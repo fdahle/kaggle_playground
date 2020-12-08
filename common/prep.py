@@ -101,3 +101,16 @@ def calc_threshold(input, threshold):
     data[data < threshold] = 0
 
     return data
+
+def handle_nan(pdFrame, type):
+
+    if type == "auto":
+        pass
+    elif type == "drop":
+        pass
+    elif type == "null":
+        pass
+    elif type == "avg":
+        #replace value with avg values
+        #or for nun numeric values the one that can be found most in data
+        pass
