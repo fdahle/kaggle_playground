@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from torch.optim import Adam
-
 import sys
 sys.path.insert(0, '../../common')
 from prep import *
@@ -45,8 +43,8 @@ X_test = has_Entry(X_test, "Title", ["Dr", "Rev"], delete=True)
 X_train = calc_scale(X_train, columns=["Pclass", "Age", "SibSp", "Parch", "Fare"])
 X_test = calc_scale(X_test, columns=["Pclass", "Age", "SibSp", "Parch", "Fare"])
 
-X_train = X_train.fillna(0)
-X_test = X_test.fillna(0)
+X_train = handle_nan(X_train, type="auto")
+X_test = handle_nan(X_test, type="auto")
 
 #def calculate_accuracy(y_true, y_pred):
 #  predicted = y_pred.ge(.5).view(-1)

@@ -2,21 +2,36 @@ import pandas as pd
 import torch
 
 from sklearn.preprocessing import StandardScaler
+from pandas.api.types import is_numeric_dtype
 
 #print all entries of a dataframe (really all!)
 def printAll(pdFrame):
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
         print(pdFrame)
 
+#drop columns from dataframe
+def dropColumns(pdFrame, columns):
+
+    if not isinstance(columns, list):
+        columns=[columns]
+
+    pdFrame = pdFrame.drop(columns=columns)
+
+    return pdFrame
+
 #merge dataframes together
 def merge_dataframes(pdFrame1, pdFrame2):
     pdFrame = pd.concat([pdFrame1, pdFrame2], axis=1)
     return pdFrame
 
+def reshape_dataframe(pdFrame, newShape):
+    data = pdFrame.values.reshape(newShape)
+    return data
+
 #one hot encode columns
 def one_hot_encode(pdFrame, columnName):
     encoded = pd.get_dummies(pdFrame[columnName], prefix= columnName)
-    pdFrame = pdFrame.drop(columns=[columnName])
+    pdFrame = dropColumns(pdFrame, [columnName])
     pdFrame = merge_dataframes(pdFrame, encoded)
     return pdFrame
 
@@ -53,7 +68,7 @@ def split_column(pdFrame, columnName, delimiter, keep=-1, title=""):
         else:
             splitted.columns = [title]
 
-    pdFrame = pdFrame.drop(columns=[columnName])
+    pdFrame = dropColumns(pdFrame, [columnName])
 
     pdFrame = merge_dataframes(pdFrame, splitted)
     return pdFrame
@@ -73,7 +88,7 @@ def has_Entry(pdFrame, columnName, entries, delete=False):
         pdFrame = merge_dataframes(pdFrame, contains)
 
     if delete:
-        pdFrame = pdFrame.drop(columns=[columnName])
+        pdFrame = dropColumns(pdFrame, [columnName])
 
     return pdFrame
 
@@ -102,15 +117,81 @@ def calc_threshold(input, threshold):
 
     return data
 
-def handle_nan(pdFrame, type):
+def handle_nan(pdFrame, type="auto", val=""):
 
     if type == "auto":
-        pass
+
+        #save columns that should be dropped
+        to_drop = []
+        for column in pdFrame:
+
+            #check for NaN
+            if pdFrame[column].isnull().values.any():
+
+                sum_nan = pdFrame[column].isnull().values.sum()
+                percentage_nan = sum_nan / pdFrame[column].shape[0] * 100
+
+                #take average if below 50% are nan values
+                if percentage_nan < 50:
+                    pdFrame[column] = handle_nan(pdFrame[column].to_frame(), "avg")
+
+                #otherwise drop the column
+                else:
+                    to_drop.append(column)
+
+        #drop columns with Nan
+        pdFrame = dropColumns(pdFrame, to_drop)
+
+    #asap a nan value is in the column drop the column
     elif type == "drop":
-        pass
-    elif type == "null":
-        pass
+
+        #save columns that should be dropped
+        to_drop = []
+
+        #iterate all columns
+        for column in pdFrame:
+
+            #check for NaN
+            if pdFrame[column].isnull().values.any():
+                to_drop.append(column)
+
+        #drop columns with Nan
+        pdFrame = dropColumns(pdFrame, to_drop)
+
+    #replace value with avg values
+    #or for nun numeric values the one that can be found most in data
     elif type == "avg":
-        #replace value with avg values
-        #or for nun numeric values the one that can be found most in data
-        pass
+
+        #iterate all columns
+        for column in pdFrame:
+
+            #check for NaN
+            if pdFrame[column].isnull().values.any():
+
+                #check type of column
+                if is_numeric_dtype(pdFrame[column]):
+
+                    #check if it may be boolean
+                    uniqueList = pdFrame[column].unique().tolist()
+                    if (uniqueList == [0,1] or uniqueList == [1,0]):
+                        most_common_val = pdFrame[column].mode()[0]
+                        pdFrame[column] = handle_nan(pdFrame[column].to_frame(), "val", val=most_common_val)
+
+                    #here we can calulate the avg
+                    else:
+                        avg_val = pdFrame[column].mean()
+                        pdFrame[column] = handle_nan(pdFrame[column].to_frame(), "val", val=avg_val)
+
+                #objects, so take most common value
+                else:
+                    most_common_val = pdFrame[column].mode()[0]
+                    pdFrame[column] = handle_nan(pdFrame[column].to_frame(), "val", val=most_common_val)
+
+    #replace Nan values with a certain value
+    elif type == "val":
+        if val == "":
+            raise Exception("value cannot be empty")
+
+        pdFrame = pdFrame.fillna(val)
+
+    return pdFrame
